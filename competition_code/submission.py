@@ -10,7 +10,39 @@ import numpy as np
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
 
-def get_lateral_pid_config(self):
+def filter_waypoints(location : np.ndarray, current_idx: int, waypoints : List[roar_py_interface.RoarPyWaypoint]) -> int:
+    def dist_to_waypoint(waypoint : roar_py_interface.RoarPyWaypoint):
+        return np.linalg.norm(
+            location[:2] - waypoint.location[:2]
+        )
+    for i in range(current_idx, len(waypoints) + current_idx):
+        if dist_to_waypoint(waypoints[i%len(waypoints)]) < 3:
+            return i % len(waypoints)
+    return current_idx
+
+class RoarCompetitionSolution:
+    def __init__(
+        self,
+        maneuverable_waypoints: List[roar_py_interface.RoarPyWaypoint],
+        vehicle : roar_py_interface.RoarPyActor,
+        camera_sensor : roar_py_interface.RoarPyCameraSensor = None,
+        location_sensor : roar_py_interface.RoarPyLocationInWorldSensor = None,
+        velocity_sensor : roar_py_interface.RoarPyVelocimeterSensor = None,
+        rpy_sensor : roar_py_interface.RoarPyRollPitchYawSensor = None,
+        occupancy_map_sensor : roar_py_interface.RoarPyOccupancyMapSensor = None,
+        collision_sensor : roar_py_interface.RoarPyCollisionSensor = None,
+    ) -> None:
+        self.maneuverable_waypoints = maneuverable_waypoints
+        self.vehicle = vehicle
+        self.camera_sensor = camera_sensor
+        self.location_sensor = location_sensor
+        self.velocity_sensor = velocity_sensor
+        self.rpy_sensor = rpy_sensor
+        self.occupancy_map_sensor = occupancy_map_sensor
+        self.collision_sensor = collision_sensor
+        self.lat_pid_controller = LatPIDController(config=self.get_lateral_pid_config())
+
+    def get_lateral_pid_config(self):
         conf = {
         "60": {
                 "Kp": 0.8,
@@ -79,38 +111,6 @@ def get_lateral_pid_config(self):
         }
         }
         return conf
-
-def filter_waypoints(location : np.ndarray, current_idx: int, waypoints : List[roar_py_interface.RoarPyWaypoint]) -> int:
-    def dist_to_waypoint(waypoint : roar_py_interface.RoarPyWaypoint):
-        return np.linalg.norm(
-            location[:2] - waypoint.location[:2]
-        )
-    for i in range(current_idx, len(waypoints) + current_idx):
-        if dist_to_waypoint(waypoints[i%len(waypoints)]) < 3:
-            return i % len(waypoints)
-    return current_idx
-
-class RoarCompetitionSolution:
-    def __init__(
-        self,
-        maneuverable_waypoints: List[roar_py_interface.RoarPyWaypoint],
-        vehicle : roar_py_interface.RoarPyActor,
-        camera_sensor : roar_py_interface.RoarPyCameraSensor = None,
-        location_sensor : roar_py_interface.RoarPyLocationInWorldSensor = None,
-        velocity_sensor : roar_py_interface.RoarPyVelocimeterSensor = None,
-        rpy_sensor : roar_py_interface.RoarPyRollPitchYawSensor = None,
-        occupancy_map_sensor : roar_py_interface.RoarPyOccupancyMapSensor = None,
-        collision_sensor : roar_py_interface.RoarPyCollisionSensor = None,
-    ) -> None:
-        self.maneuverable_waypoints = maneuverable_waypoints
-        self.vehicle = vehicle
-        self.camera_sensor = camera_sensor
-        self.location_sensor = location_sensor
-        self.velocity_sensor = velocity_sensor
-        self.rpy_sensor = rpy_sensor
-        self.occupancy_map_sensor = occupancy_map_sensor
-        self.collision_sensor = collision_sensor
-        self.lat_pid_controller = LatPIDController(config=self.get_lateral_pid_config())
     
     async def initialize(self) -> None:
         # TODO: You can do some initial computation here if you want to.
