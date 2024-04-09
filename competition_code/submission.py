@@ -6,6 +6,7 @@ Please do not change anything else but fill out the to-do sections.
 from typing import List, Tuple, Dict, Optional
 import roar_py_interface
 import numpy as np
+from collections import deque
 
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
@@ -232,6 +233,15 @@ class LatPIDController():
         )
 
         return lat_control
+
+    def find_k_values(self, current_speed: float, config: dict) -> np.array:
+        k_p, k_d, k_i = 1, 0, 0
+        for speed_upper_bound, kvalues in config.items():
+            speed_upper_bound = float(speed_upper_bound)
+            if current_speed < speed_upper_bound:
+                k_p, k_d, k_i = kvalues["Kp"], kvalues["Kd"], kvalues["Ki"]
+                break
+        return np.array([k_p, k_d, k_i])
 
     def find_waypoint_error(self, vehicle_location, vehicle_rotation, current_speed, waypoint) -> float:
         # calculate a vector that represent where you are going
