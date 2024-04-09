@@ -110,6 +110,7 @@ class RoarCompetitionSolution:
         self.rpy_sensor = rpy_sensor
         self.occupancy_map_sensor = occupancy_map_sensor
         self.collision_sensor = collision_sensor
+        self.lat_pid_controller = LatPIDController(config=self.get_lateral_pid_config())
     
     async def initialize(self) -> None:
         # TODO: You can do some initial computation here if you want to.
