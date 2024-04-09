@@ -111,12 +111,12 @@ class RoarCompetitionSolution:
         }
         }
         return conf
-    
+
     async def initialize(self) -> None:
         # TODO: You can do some initial computation here if you want to.
         # For example, you can compute the path to the first waypoint.
 
-        # Receive location, rotation and velocity data 
+        # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
@@ -137,13 +137,13 @@ class RoarCompetitionSolution:
         Note: You should not call receive_observation() on any sensor here, instead use get_last_observation() to get the last received observation.
         You can do whatever you want here, including apply_action() to the vehicle.
         """
-        
+
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
         vehicle_velocity_norm = np.linalg.norm(vehicle_velocity)
         current_speed_kmh = vehicle_velocity_norm * 3.6
-        
+
         # Find the waypoint closest to the vehicle
         self.current_waypoint_idx = filter_waypoints(
             vehicle_location,
@@ -151,8 +151,8 @@ class RoarCompetitionSolution:
             self.maneuverable_waypoints
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
-        waypoint_to_follow = get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
-        
+        waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
+
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
         heading_to_waypoint = np.arctan2(vector_to_waypoint[1],vector_to_waypoint[0])
@@ -171,7 +171,7 @@ class RoarCompetitionSolution:
         # throttle = 1
         # if speed > self.max_speed:
         #    throttle = 0.7
-        
+
         control = {
             "throttle": np.clip(throttle_control, 0.0, 1.0),
             "steer": steer_control,
@@ -200,7 +200,7 @@ class LatPIDController():
         v_end = v_begin + direction_vector
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
-        
+
         # calculate error projection
         w_vec = np.array(
             [
@@ -232,7 +232,7 @@ class LatPIDController():
         )
 
         return lat_control
-    
+
     def find_waypoint_error(self, vehicle_location, vehicle_rotation, current_speed, waypoint) -> float:
         # calculate a vector that represent where you are going
         v_begin = vehicle_location
@@ -243,12 +243,12 @@ class LatPIDController():
         v_end = v_begin + direction_vector
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
-        
+
         # calculate error projection
         w_vec = np.array(
             [
-                next_waypoint.location[0] - v_begin[0],
-                next_waypoint.location[1] - v_begin[1],
+                waypoint.location[0] - v_begin[0],
+                waypoint.location[1] - v_begin[1],
                 0,
             ]
         )
@@ -258,6 +258,6 @@ class LatPIDController():
         error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1)) # makes sure arccos input is between -1 and 1, inclusive
 
         return error
-        
+
     def get_waypoint_at_offset(self, maneuverable_waypoints, current_index, offset):
-        return maneuverable_waypoints[(current_waypoint_idx + offset) % len(maneuverable_waypoints)]
+        return maneuverable_waypoints[(current_index + offset) % len(maneuverable_waypoints)]
