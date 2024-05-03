@@ -3,10 +3,11 @@ Competition instructions:
 Please do not change anything else but fill out the to-do sections.
 """
 
-from typing import List, Tuple, Dict, Optional
 import roar_py_interface
 import numpy as np
+import os
 from collections import deque
+from typing import List, Tuple, Dict, Optional
 
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
@@ -46,7 +47,7 @@ class RoarCompetitionSolution:
     def get_lateral_pid_config(self):
         conf = {
         "60": {
-                "Kp": 0.8,
+                "Kp": 0.6,
                 "Kd": 0.05,
                 "Ki": 0.05
         },
@@ -62,52 +63,52 @@ class RoarCompetitionSolution:
         },
         "90": {
                 "Kp": 0.5,
-                "Kd": 0.11,
+                "Kd": 0.13,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.45,
-                "Kd": 0.12,
+                "Kp": 0.4,
+                "Kd": 0.15,
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.4,
-                "Kd": 0.13,
+                "Kp": 0.2,
+                "Kd": 0.17,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.30,
+                "Kp": 0.1,
                 "Kd": 0.2,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.25,
+                "Kp": 0.1,
                 "Kd": 0.2,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.25,
+                "Kp": 0.1,
                 "Kd": 0.2,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.25,
+                "Kp": 0.1,
                 "Kd": 0.2,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.28,
+                "Kp": 0.1,
                 "Kd": 0.2,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.26,
-                "Kd": 0.1,
+                "Kp": 0.1,
+                "Kd": 0.25,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.205,
-                "Kd": 0.1,
+                "Kp": 0.1,
+                "Kd": 0.3,
                 "Ki": 0.017
         }
         }
@@ -147,7 +148,8 @@ class RoarCompetitionSolution:
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
         far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 25)
-        really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 40)
+        really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 60)
+        ludicrously_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 120)
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
@@ -160,33 +162,68 @@ class RoarCompetitionSolution:
         steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
         far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, far_waypoint)
         really_far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, really_far_waypoint)
+        ludicrously_far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, ludicrously_far_waypoint)
 
         throttle = 1
         brake = 0
-        if speed > 200:
-           throttle = 0.7
+        os.system("cls")
         if abs(steer_control) > 0.3 and speed > 40:
+            print("Extremely sharp steer")
+            throttle = 0
+            brake = 1
+        elif abs(steer_control) > 0.2 and speed > 60:
+            print("Sharp steer")
+            throttle = 0
+            brake = 1
+        elif abs(steer_control) > 0.1 and speed > 100:
+            print("Steer")
             throttle = 0
             brake = 1
         elif abs(steer_control) > 0.05 and speed > 120:
-            throttle = 0
-            brake = 1
-        elif abs(far_error) > 0.5 and speed > 60:
-            throttle = 0
-            brake = 1
-        elif abs(far_error) > 0.1 and speed > 80:
-            throttle = 0
-            brake = 1
-        elif abs(far_error) > 0.05 and speed > 100:
-            throttle = 0
-            brake = 1
-        elif abs(really_far_error) > 0.1 and speed > 140:
-            throttle = 0
-            brake = 1
-        elif abs(really_far_error) > 0.05 and speed > 120:
+            print("Minor steer")
             throttle = 0
             brake = 1
 
+        if abs(far_error) > 0.5 and speed > 60:
+            print("Curve peak")
+            throttle = 0
+            brake = 1
+        elif abs(far_error) > 0.1 and speed > 80:
+            print("Mid curve")
+            throttle = 0
+            brake = 1
+        elif abs(far_error) > 0.05 and speed > 100:
+            print("Entering curve")
+            throttle = 0
+            brake = 1
+
+        if abs(really_far_error) > 0.2 and speed > 80:
+            print("Slowing down")
+            throttle = 0
+            brake = 1
+        elif abs(really_far_error) > 0.1 and speed > 100:
+            print("Preparing for curve")
+            throttle = 0
+            brake = 1
+        elif abs(really_far_error) > 0.05 and speed > 120:
+            print("Curve approaching")
+            throttle = 0
+            brake = 1
+
+        if abs(ludicrously_far_error) > 0.2 and speed > 150:
+            print("Woah there!")
+            throttle = 0
+            brake = 1
+        elif abs(ludicrously_far_error) > 0.1 and speed > 180:
+            print("Things are about to not be that great")
+            throttle = 0
+            brake = 1
+        elif abs(ludicrously_far_error) > 0.05 and speed > 200:
+            print("Buckle your seatbelts")
+            throttle = 0
+            brake = 1
+
+        print(round(steer_control * 100)/100)
         print(round(far_error * 100)/100)
         print(round(really_far_error * 100)/100)
         print(round(speed))
