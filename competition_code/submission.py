@@ -92,22 +92,22 @@ class RoarCompetitionSolution:
         },
         "180": {
                 "Kp": 0.25,
-                "Kd": 0.02,
+                "Kd": 0.1,
                 "Ki": 0.05
         },
         "200": {
                 "Kp": 0.28,
-                "Kd": 0.03,
+                "Kd": 0.1,
                 "Ki": 0.04
         },
         "230": {
                 "Kp": 0.26,
-                "Kd": 0.04,
+                "Kd": 0.1,
                 "Ki": 0.05
         },
         "300": {
                 "Kp": 0.205,
-                "Kd": 0.008,
+                "Kd": 0.1,
                 "Ki": 0.017
         }
         }
@@ -168,10 +168,10 @@ class RoarCompetitionSolution:
         if abs(steer_control) > 0.05 and speed > 100:
             throttle = 0
             brake = 1
-        elif abs(far_error) > 0.05 and speed > 60:
+        elif abs(far_error) > 0.05 and speed > 80:
             throttle = 0
             brake = 1
-        elif abs(far_error) > 0.1 and speed > 80:
+        elif abs(far_error) > 0.1 and speed > 100:
             throttle = 0
             brake = 1
         elif abs(really_far_error) > 0.05 and speed > 100:
