@@ -56,48 +56,48 @@ class RoarCompetitionSolution:
                 "Ki": 0.07
         },
         "80": {
-                "Kp": 0.60,
+                "Kp": 0.6,
                 "Kd": 0.08,
                 "Ki": 0.08
         },
         "90": {
                 "Kp": 0.5,
-                "Kd": 0.09,
+                "Kd": 0.11,
                 "Ki": 0.09
         },
         "100": {
                 "Kp": 0.45,
-                "Kd": 0.09,
+                "Kd": 0.12,
                 "Ki": 0.1
         },
         "120": {
                 "Kp": 0.4,
-                "Kd": 0.1,
+                "Kd": 0.13,
                 "Ki": 0.1
         },
         "130": {
                 "Kp": 0.30,
-                "Kd": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.09
         },
         "140": {
                 "Kp": 0.25,
-                "Kd": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.09
         },
         "160": {
                 "Kp": 0.25,
-                "Kd": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.06
         },
         "180": {
                 "Kp": 0.25,
-                "Kd": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.05
         },
         "200": {
                 "Kp": 0.28,
-                "Kd": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.04
         },
         "230": {
@@ -165,20 +165,30 @@ class RoarCompetitionSolution:
         brake = 0
         if speed > 200:
            throttle = 0.7
-        if abs(steer_control) > 0.05 and speed > 100:
+        if abs(steer_control) > 0.3 and speed > 40:
             throttle = 0
             brake = 1
-        elif abs(far_error) > 0.05 and speed > 80:
+        elif abs(steer_control) > 0.05 and speed > 120:
             throttle = 0
             brake = 1
-        elif abs(far_error) > 0.1 and speed > 100:
+        elif abs(far_error) > 0.5 and speed > 60:
             throttle = 0
             brake = 1
-        elif abs(really_far_error) > 0.05 and speed > 100:
+        elif abs(far_error) > 0.1 and speed > 80:
+            throttle = 0
+            brake = 1
+        elif abs(far_error) > 0.05 and speed > 100:
+            throttle = 0
+            brake = 1
+        elif abs(really_far_error) > 0.1 and speed > 140:
+            throttle = 0
+            brake = 1
+        elif abs(really_far_error) > 0.05 and speed > 120:
             throttle = 0
             brake = 1
 
         print(round(far_error * 100)/100)
+        print(round(really_far_error * 100)/100)
         print(round(speed))
 
         control = {
