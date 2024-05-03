@@ -146,7 +146,7 @@ class RoarCompetitionSolution:
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
         vehicle_velocity_norm = np.linalg.norm(vehicle_velocity)
-        current_speed_kmh = vehicle_velocity_norm * 3.6
+        speed = vehicle_velocity_norm * 3.6
 
 
         # Find the waypoint closest to the vehicle
@@ -157,7 +157,6 @@ class RoarCompetitionSolution:
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
-        waypoint_to_follow = self.maneuverable_waypoints[(self.current_waypoint_idx + 3) % len(self.maneuverable_waypoints)]
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
@@ -167,25 +166,17 @@ class RoarCompetitionSolution:
         delta_heading = normalize_rad(heading_to_waypoint - vehicle_rotation[2])
 
         # Proportional controller to steer the vehicle towards the target waypoint
-        steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, current_speed_kmh, waypoint_to_follow)
-        steer_control = (
-            -8.0 / np.sqrt(vehicle_velocity_norm) * delta_heading / np.pi
-        ) if vehicle_velocity_norm > 1e-2 else -np.sign(delta_heading)
-        steer_control = np.clip(steer_control, -1.0, 1.0)
+        steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
 
-        # Proportional controller to control the vehicle's speed towards 40 m/s
-        throttle_control = 0.05 * (20 - vehicle_velocity_norm)
-        brake = -throttle_control
-
-        # throttle = 1
-        # if speed > self.max_speed:
-        #    throttle = 0.7
+        throttle = 1
+        brake = 0
+        if speed > 200:
+           throttle = 0.7
 
         control = {
-            "throttle": np.clip(throttle_control, 0.0, 1.0),
+            "throttle": np.clip(throttle, 0.0, 1.0),
             "steer": steer_control,
             "brake": np.clip(brake, 0.0, 1.0),
-            "brake": np.clip(-throttle_control, 0.0, 1.0),
             "hand_brake": 0.0,
             "reverse": 0,
             "target_gear": 0
