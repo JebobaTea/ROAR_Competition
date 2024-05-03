@@ -77,7 +77,8 @@ class RoarCompetitionRule:
         
         self.furthest_waypoints_index += min_index #= new_furthest_index
         self._last_vehicle_location = current_location
-        print(f"reach waypoints {self.furthest_waypoints_index} at {self.waypoints[self.furthest_waypoints_index].location}")
+        #print(f"reach waypoints {self.furthest_waypoints_index} at {self.waypoints[self.furthest_waypoints_index].location}")
+        print(f"reach waypoints {self.furthest_waypoints_index}")
 
     
     async def respawn(
