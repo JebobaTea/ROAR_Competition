@@ -140,7 +140,6 @@ class RoarCompetitionSolution:
         Note: You should not call receive_observation() on any sensor here, instead use get_last_observation() to get the last received observation.
         You can do whatever you want here, including apply_action() to the vehicle.
         """
-        # TODO: Implement your solution here.
 
         # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
