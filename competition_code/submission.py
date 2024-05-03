@@ -56,42 +56,42 @@ class RoarCompetitionSolution:
                 "Ki": 0.07
         },
         "80": {
-                "Kp": 0.66,
+                "Kp": 0.60,
                 "Kd": 0.08,
                 "Ki": 0.08
         },
         "90": {
-                "Kp": 0.63,
+                "Kp": 0.5,
                 "Kd": 0.09,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.6,
-                "Kd": 0.1,
+                "Kp": 0.45,
+                "Kd": 0.09,
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.52,
+                "Kp": 0.4,
                 "Kd": 0.1,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.51,
+                "Kp": 0.30,
                 "Kd": 0.1,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.45,
+                "Kp": 0.25,
                 "Kd": 0.1,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.4,
-                "Kd": 0.05,
+                "Kp": 0.25,
+                "Kd": 0.1,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.28,
+                "Kp": 0.25,
                 "Kd": 0.02,
                 "Ki": 0.05
         },
@@ -115,11 +115,6 @@ class RoarCompetitionSolution:
 
 
     async def initialize(self) -> None:
-        # TODO: You can do some initial computation here if you want to.
-        # For example, you can compute the path to the first waypoint.
-
-        # Receive location, rotation and velocity data
-        # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
@@ -135,12 +130,6 @@ class RoarCompetitionSolution:
     async def step(
         self
     ) -> None:
-        """
-        This function is called every world step.
-        Note: You should not call receive_observation() on any sensor here, instead use get_last_observation() to get the last received observation.
-        You can do whatever you want here, including apply_action() to the vehicle.
-        """
-
         # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
@@ -157,6 +146,8 @@ class RoarCompetitionSolution:
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
+        far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 25)
+        really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 40)
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
@@ -167,11 +158,28 @@ class RoarCompetitionSolution:
 
         # Proportional controller to steer the vehicle towards the target waypoint
         steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
+        far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, far_waypoint)
+        really_far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, really_far_waypoint)
 
         throttle = 1
         brake = 0
         if speed > 200:
            throttle = 0.7
+        if abs(steer_control) > 0.05 and speed > 100:
+            throttle = 0
+            brake = 1
+        elif abs(far_error) > 0.05 and speed > 60:
+            throttle = 0
+            brake = 1
+        elif abs(far_error) > 0.1 and speed > 80:
+            throttle = 0
+            brake = 1
+        elif abs(really_far_error) > 0.05 and speed > 100:
+            throttle = 0
+            brake = 1
+
+        print(round(far_error * 100)/100)
+        print(round(speed))
 
         control = {
             "throttle": np.clip(throttle, 0.0, 1.0),
@@ -192,7 +200,6 @@ class LatPIDController():
         self._dt = dt
 
     def run_in_series(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint) -> float:
-        # calculate a vector that represent where you are going
         v_begin = vehicle_location
         direction_vector = np.array([
             np.cos(normalize_rad(vehicle_rotation[2])),
@@ -202,7 +209,6 @@ class LatPIDController():
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
 
-        # calculate error projection
         w_vec = np.array(
             [
                 next_waypoint.location[0] - v_begin[0],
@@ -213,7 +219,7 @@ class LatPIDController():
 
         v_vec_normed = v_vec / np.linalg.norm(v_vec)
         w_vec_normed = w_vec / np.linalg.norm(w_vec)
-        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1)) # makes sure arccos input is between -1 and 1, inclusive
+        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1))
         _cross = np.cross(v_vec_normed, w_vec_normed)
 
         if _cross[2] > 0:
@@ -244,7 +250,6 @@ class LatPIDController():
         return np.array([k_p, k_d, k_i])
 
     def find_waypoint_error(self, vehicle_location, vehicle_rotation, current_speed, waypoint) -> float:
-        # calculate a vector that represent where you are going
         v_begin = vehicle_location
         direction_vector = np.array([
             np.cos(normalize_rad(vehicle_rotation[2])),
@@ -254,7 +259,6 @@ class LatPIDController():
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
 
-        # calculate error projection
         w_vec = np.array(
             [
                 waypoint.location[0] - v_begin[0],
@@ -265,7 +269,7 @@ class LatPIDController():
 
         v_vec_normed = v_vec / np.linalg.norm(v_vec)
         w_vec_normed = w_vec / np.linalg.norm(w_vec)
-        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1)) # makes sure arccos input is between -1 and 1, inclusive
+        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1))
 
         return error
 
