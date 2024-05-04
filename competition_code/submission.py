@@ -87,27 +87,27 @@ class RoarCompetitionSolution:
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.1,
-                "Kd": 0.2,
+                "Kp": 0.09,
+                "Kd": 0.25,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.1,
-                "Kd": 0.2,
+                "Kp": 0.08,
+                "Kd": 0.25,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.1,
-                "Kd": 0.2,
+                "Kp": 0.07,
+                "Kd": 0.25,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.1,
+                "Kp": 0.06,
                 "Kd": 0.25,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.1,
+                "Kp": 0.05,
                 "Kd": 0.3,
                 "Ki": 0.017
         }
@@ -169,8 +169,8 @@ class RoarCompetitionSolution:
         os.system("cls")
         if abs(steer_control) > 0.3 and speed > 60:
             print("Extremely sharp steer")
-            throttle = 0
-            brake = 1
+            throttle = 0.2
+            brake = 0.8
         elif abs(steer_control) > 0.2 and speed > 80:
             print("Sharp steer")
             throttle = 0
@@ -190,25 +190,25 @@ class RoarCompetitionSolution:
             brake = 1
         elif abs(far_error) > 0.1 and speed > 80:
             print("Mid curve")
-            throttle = 0.7
+            throttle = 0.8
             brake = 0
         elif abs(far_error) > 0.05 and speed > 100:
             print("Entering curve")
-            throttle = 0
-            brake = 1
+            throttle = 0.5
+            brake = 0.5
 
         if abs(really_far_error) > 0.2 and speed > 100:
             print("Slowing down")
-            throttle = 0
-            brake = 1
+            throttle = 0.8
+            brake = 0.2
         elif abs(really_far_error) > 0.1 and speed > 110:
             print("Preparing for curve")
             throttle = 0
             brake = 1
         elif abs(really_far_error) > 0.05 and speed > 120:
             print("Curve approaching")
-            throttle = 0
-            brake = 1
+            throttle = 0.8
+            brake = 0
 
         if abs(ludicrously_far_error) > 0.2 and speed > 150:
             print("Woah there!")
