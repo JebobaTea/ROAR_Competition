@@ -72,8 +72,8 @@ class RoarCompetitionSolution:
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.2,
-                "Kd": 0.17,
+                "Kp": 0.15,
+                "Kd": 0.2,
                 "Ki": 0.1
         },
         "130": {
@@ -167,11 +167,11 @@ class RoarCompetitionSolution:
         throttle = 1
         brake = 0
         os.system("cls")
-        if abs(steer_control) > 0.3 and speed > 40:
+        if abs(steer_control) > 0.3 and speed > 60:
             print("Extremely sharp steer")
             throttle = 0
             brake = 1
-        elif abs(steer_control) > 0.2 and speed > 60:
+        elif abs(steer_control) > 0.2 and speed > 80:
             print("Sharp steer")
             throttle = 0
             brake = 1
@@ -181,8 +181,8 @@ class RoarCompetitionSolution:
             brake = 1
         elif abs(steer_control) > 0.05 and speed > 120:
             print("Minor steer")
-            throttle = 0
-            brake = 1
+            throttle = 0.7
+            brake = 0.3
 
         if abs(far_error) > 0.5 and speed > 60:
             print("Curve peak")
@@ -190,18 +190,18 @@ class RoarCompetitionSolution:
             brake = 1
         elif abs(far_error) > 0.1 and speed > 80:
             print("Mid curve")
-            throttle = 0
-            brake = 1
+            throttle = 0.7
+            brake = 0
         elif abs(far_error) > 0.05 and speed > 100:
             print("Entering curve")
             throttle = 0
             brake = 1
 
-        if abs(really_far_error) > 0.2 and speed > 80:
+        if abs(really_far_error) > 0.2 and speed > 100:
             print("Slowing down")
             throttle = 0
             brake = 1
-        elif abs(really_far_error) > 0.1 and speed > 100:
+        elif abs(really_far_error) > 0.1 and speed > 110:
             print("Preparing for curve")
             throttle = 0
             brake = 1
