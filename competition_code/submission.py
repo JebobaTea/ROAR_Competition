@@ -47,7 +47,7 @@ class RoarCompetitionSolution:
     def get_lateral_pid_config(self):
         conf = {
         "60": {
-                "Kp": 0.6,
+                "Kp": 0.7,
                 "Kd": 0.05,
                 "Ki": 0.05
         },
@@ -57,7 +57,7 @@ class RoarCompetitionSolution:
                 "Ki": 0.07
         },
         "80": {
-                "Kp": 0.6,
+                "Kp": 0.65,
                 "Kd": 0.08,
                 "Ki": 0.08
         },
@@ -87,23 +87,23 @@ class RoarCompetitionSolution:
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.09,
-                "Kd": 0.25,
+                "Kp": 0.05,
+                "Kd": 0.3,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.08,
-                "Kd": 0.25,
+                "Kp": 0.05,
+                "Kd": 0.3,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.07,
-                "Kd": 0.25,
+                "Kp": 0.05,
+                "Kd": 0.3,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.06,
-                "Kd": 0.25,
+                "Kp": 0.05,
+                "Kd": 0.3,
                 "Ki": 0.05
         },
         "300": {
@@ -169,8 +169,8 @@ class RoarCompetitionSolution:
         os.system("cls")
         if abs(steer_control) > 0.3 and speed > 60:
             print("Extremely sharp steer")
-            throttle = 0.2
-            brake = 0.8
+            throttle = 0.5
+            brake = 0.5
         elif abs(steer_control) > 0.2 and speed > 80:
             print("Sharp steer")
             throttle = 0
@@ -182,7 +182,7 @@ class RoarCompetitionSolution:
         elif abs(steer_control) > 0.05 and speed > 120:
             print("Minor steer")
             throttle = 0.7
-            brake = 0.3
+            brake = 0
 
         if abs(far_error) > 0.5 and speed > 60:
             print("Curve peak")
@@ -199,8 +199,8 @@ class RoarCompetitionSolution:
 
         if abs(really_far_error) > 0.2 and speed > 100:
             print("Slowing down")
-            throttle = 0.8
-            brake = 0.2
+            throttle = 0.5
+            brake = 0.5
         elif abs(really_far_error) > 0.1 and speed > 110:
             print("Preparing for curve")
             throttle = 0
@@ -214,11 +214,11 @@ class RoarCompetitionSolution:
             print("Woah there!")
             throttle = 0
             brake = 1
-        elif abs(ludicrously_far_error) > 0.1 and speed > 180:
+        elif abs(ludicrously_far_error) > 0.1 and speed > 170:
             print("Things are about to not be that great")
             throttle = 0
             brake = 1
-        elif abs(ludicrously_far_error) > 0.05 and speed > 200:
+        elif abs(ludicrously_far_error) > 0.05 and speed > 180:
             print("Buckle your seatbelts")
             throttle = 0
             brake = 1
