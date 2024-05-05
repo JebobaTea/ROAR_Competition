@@ -147,9 +147,7 @@ class RoarCompetitionSolution:
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
-        far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 25)
-        really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 60)
-        ludicrously_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 120)
+        lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/3))
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
@@ -160,72 +158,40 @@ class RoarCompetitionSolution:
 
         # Proportional controller to steer the vehicle towards the target waypoint
         steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
-        far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, far_waypoint)
-        really_far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, really_far_waypoint)
-        ludicrously_far_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, ludicrously_far_waypoint)
+        error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, lookahead)
 
         throttle = 1
         brake = 0
         os.system("cls")
+
         if abs(steer_control) > 0.3 and speed > 60:
-            print("Extremely sharp steer")
             throttle = 0.5
             brake = 0.5
         elif abs(steer_control) > 0.2 and speed > 80:
-            print("Sharp steer")
             throttle = 0
             brake = 1
         elif abs(steer_control) > 0.1 and speed > 100:
-            print("Steer")
             throttle = 0
             brake = 1
         elif abs(steer_control) > 0.05 and speed > 120:
-            print("Minor steer")
             throttle = 0.7
             brake = 0
 
-        if abs(far_error) > 0.5 and speed > 60:
-            print("Curve peak")
+        if abs(error) > 0.3 and speed > 60:
             throttle = 0
             brake = 1
-        elif abs(far_error) > 0.1 and speed > 80:
-            print("Mid curve")
-            throttle = 0.8
-            brake = 0
-        elif abs(far_error) > 0.05 and speed > 100:
-            print("Entering curve")
+        elif abs(error) > 0.2 and speed > 80:
+            throttle = 0.3
+            brake = 0.7
+        elif abs(error) > 0.1 and speed > 120:
             throttle = 0.5
             brake = 0.5
-
-        if abs(really_far_error) > 0.2 and speed > 100:
-            print("Slowing down")
-            throttle = 0.5
-            brake = 0.5
-        elif abs(really_far_error) > 0.1 and speed > 110:
-            print("Preparing for curve")
-            throttle = 0
-            brake = 1
-        elif abs(really_far_error) > 0.05 and speed > 120:
-            print("Curve approaching")
-            throttle = 0.8
+        elif abs(error) > 0.05 and speed > 160:
+            throttle = 0.7
             brake = 0
-
-        if abs(ludicrously_far_error) > 0.2 and speed > 150:
-            print("Woah there!")
-            throttle = 0
-            brake = 1
-        elif abs(ludicrously_far_error) > 0.1 and speed > 170:
-            print("Things are about to not be that great")
-            throttle = 0
-            brake = 1
-        elif abs(ludicrously_far_error) > 0.05 and speed > 180:
-            print("Buckle your seatbelts")
-            throttle = 0
-            brake = 1
 
         print(round(steer_control * 100)/100)
-        print(round(far_error * 100)/100)
-        print(round(really_far_error * 100)/100)
+        print(round(error * 100)/100)
         print(round(speed))
 
         control = {
