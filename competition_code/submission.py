@@ -62,7 +62,7 @@ class RoarCompetitionSolution:
                 "Ki": 0.08
         },
         "90": {
-                "Kp": 0.5,
+                "Kp": 0.53,
                 "Kd": 0.13,
                 "Ki": 0.09
         },
@@ -72,12 +72,12 @@ class RoarCompetitionSolution:
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.15,
+                "Kp": 0.35,
                 "Kd": 0.2,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.1,
+                "Kp": 0.22,
                 "Kd": 0.2,
                 "Ki": 0.09
         },
@@ -92,22 +92,22 @@ class RoarCompetitionSolution:
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.05,
+                "Kp": 0.02,
                 "Kd": 0.3,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.05,
+                "Kp": 0.02,
                 "Kd": 0.3,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.05,
+                "Kp": 0.02,
                 "Kd": 0.3,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.05,
+                "Kp": 0.02,
                 "Kd": 0.3,
                 "Ki": 0.017
         }
@@ -147,7 +147,12 @@ class RoarCompetitionSolution:
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
-        lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/3))
+        if speed > 100:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/3))
+        elif speed > 80:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/10))
+        else:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/15))
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
