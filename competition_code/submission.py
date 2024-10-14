@@ -3,10 +3,11 @@ Competition instructions:
 Please do not change anything else but fill out the to-do sections.
 """
 
-from typing import List, Tuple, Dict, Optional
 import roar_py_interface
 import numpy as np
+import os
 from collections import deque
+from typing import List, Tuple, Dict, Optional
 
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
@@ -46,7 +47,7 @@ class RoarCompetitionSolution:
     def get_lateral_pid_config(self):
         conf = {
         "60": {
-                "Kp": 0.8,
+                "Kp": 0.7,
                 "Kd": 0.05,
                 "Ki": 0.05
         },
@@ -56,58 +57,58 @@ class RoarCompetitionSolution:
                 "Ki": 0.07
         },
         "80": {
-                "Kp": 0.66,
+                "Kp": 0.65,
                 "Kd": 0.08,
                 "Ki": 0.08
         },
         "90": {
-                "Kp": 0.63,
-                "Kd": 0.09,
+                "Kp": 0.53,
+                "Kd": 0.13,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.6,
-                "Kd": 0.1,
+                "Kp": 0.45,
+                "Kd": 0.15,
                 "Ki": 0.1
         },
         "120": {
-                "Kp": 0.52,
-                "Kd": 0.1,
+                "Kp": 0.4,
+                "Kd": 0.2,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.51,
-                "Kd": 0.1,
+                "Kp": 0.32,
+                "Kd": 0.2,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.45,
-                "Kd": 0.1,
+                "Kp": 0.1,
+                "Kd": 0.2,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.4,
-                "Kd": 0.05,
+                "Kp": 0.03,
+                "Kd": 0.3,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.28,
-                "Kd": 0.02,
+                "Kp": 0.02,
+                "Kd": 0.3,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.28,
-                "Kd": 0.03,
+                "Kp": 0.02,
+                "Kd": 0.3,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.26,
-                "Kd": 0.04,
+                "Kp": 0.02,
+                "Kd": 0.3,
                 "Ki": 0.05
         },
         "300": {
-                "Kp": 0.205,
-                "Kd": 0.008,
+                "Kp": 0.02,
+                "Kd": 0.3,
                 "Ki": 0.017
         }
         }
@@ -115,11 +116,6 @@ class RoarCompetitionSolution:
 
 
     async def initialize(self) -> None:
-        # TODO: You can do some initial computation here if you want to.
-        # For example, you can compute the path to the first waypoint.
-
-        # Receive location, rotation and velocity data
-        # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
@@ -135,12 +131,6 @@ class RoarCompetitionSolution:
     async def step(
         self
     ) -> None:
-        """
-        This function is called every world step.
-        Note: You should not call receive_observation() on any sensor here, instead use get_last_observation() to get the last received observation.
-        You can do whatever you want here, including apply_action() to the vehicle.
-        """
-
         # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
@@ -157,6 +147,14 @@ class RoarCompetitionSolution:
         )
          # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
+        if speed > 160:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/2.5))
+        elif speed > 100:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/3))
+        elif speed > 80:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/10))
+        else:
+            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/15))
 
         # Calculate delta vector towards the target waypoint
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
@@ -167,11 +165,32 @@ class RoarCompetitionSolution:
 
         # Proportional controller to steer the vehicle towards the target waypoint
         steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
+        error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, lookahead)
 
         throttle = 1
         brake = 0
-        if speed > 200:
-           throttle = 0.7
+        os.system("cls")
+
+        if abs(error) > 0.3 and speed > 60:
+            print("Giant error")
+            throttle = 0
+            brake = 1
+        elif abs(error) > 0.2 and speed > 80:
+            print("Large error")
+            throttle = 0.5
+            brake = 0.5
+        elif abs(error) > 0.1 and speed > 120:
+            print("Mid error")
+            throttle = 0.8
+            brake = 0.2
+        elif abs(error) > 0.05 and speed > 160:
+            print("Small error")
+            throttle = 0.7
+            brake = 0
+
+        print(round(steer_control * 100)/100)
+        print(round(error * 100)/100)
+        print(round(speed))
 
         control = {
             "throttle": np.clip(throttle, 0.0, 1.0),
@@ -192,7 +211,6 @@ class LatPIDController():
         self._dt = dt
 
     def run_in_series(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint) -> float:
-        # calculate a vector that represent where you are going
         v_begin = vehicle_location
         direction_vector = np.array([
             np.cos(normalize_rad(vehicle_rotation[2])),
@@ -202,7 +220,6 @@ class LatPIDController():
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
 
-        # calculate error projection
         w_vec = np.array(
             [
                 next_waypoint.location[0] - v_begin[0],
@@ -213,7 +230,7 @@ class LatPIDController():
 
         v_vec_normed = v_vec / np.linalg.norm(v_vec)
         w_vec_normed = w_vec / np.linalg.norm(w_vec)
-        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1)) # makes sure arccos input is between -1 and 1, inclusive
+        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1))
         _cross = np.cross(v_vec_normed, w_vec_normed)
 
         if _cross[2] > 0:
@@ -244,7 +261,6 @@ class LatPIDController():
         return np.array([k_p, k_d, k_i])
 
     def find_waypoint_error(self, vehicle_location, vehicle_rotation, current_speed, waypoint) -> float:
-        # calculate a vector that represent where you are going
         v_begin = vehicle_location
         direction_vector = np.array([
             np.cos(normalize_rad(vehicle_rotation[2])),
@@ -254,7 +270,6 @@ class LatPIDController():
 
         v_vec = np.array([(v_end[0] - v_begin[0]), (v_end[1] - v_begin[1]), 0])
 
-        # calculate error projection
         w_vec = np.array(
             [
                 waypoint.location[0] - v_begin[0],
@@ -265,7 +280,7 @@ class LatPIDController():
 
         v_vec_normed = v_vec / np.linalg.norm(v_vec)
         w_vec_normed = w_vec / np.linalg.norm(w_vec)
-        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1)) # makes sure arccos input is between -1 and 1, inclusive
+        error = np.arccos(min(max(v_vec_normed @ w_vec_normed.T, -1), 1))
 
         return error
 
