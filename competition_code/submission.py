@@ -12,6 +12,7 @@ from typing import List, Tuple, Dict, Optional
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
 
+# Util function to find closest waypoint
 def filter_waypoints(location : np.ndarray, current_idx: int, waypoints : List[roar_py_interface.RoarPyWaypoint]) -> int:
     def dist_to_waypoint(waypoint : roar_py_interface.RoarPyWaypoint):
         return np.linalg.norm(
@@ -44,6 +45,8 @@ class RoarCompetitionSolution:
         self.collision_sensor = collision_sensor
         self.lat_pid_controller = LatPIDController(config=self.get_lateral_pid_config())
 
+    # Modify PID equation coefficients depending on speed
+    # Refer to chart on the slides for the effects of raising/lowering each individual parameter
     def get_lateral_pid_config(self):
         conf = {
         "60": {
@@ -127,7 +130,7 @@ class RoarCompetitionSolution:
             self.maneuverable_waypoints
         )
 
-
+    # Called continuously during simulation (basically like a gameloop)
     async def step(
         self
     ) -> None:
@@ -145,8 +148,24 @@ class RoarCompetitionSolution:
             self.current_waypoint_idx,
             self.maneuverable_waypoints
         )
-         # We use the 3rd waypoint ahead of the current waypoint as the target waypoint
+         # Steering control is always determined by the waypoint 3 ahead of the current waypoint
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
+
+        # To determine when we slow down in anticipation of a turn, we select a waypoint ___ indices ahead of the current waypoint depending on the speed
+        # The lookahead variable refers to the waypoint in question
+        # To get a reference to a waypoint 20 waypoints ahead of the current waypoint, for example, use 
+        #   waypoint_20_ahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 20)
+        # Last competition round's winning submission actually used a predefined configuration dictionary instead of scaling offsets as a function of speed, see below:
+        # speed_to_lookahead_dict = {
+        #    90: 8,
+        #    110: 12,
+        #    130: 14,
+        #    160: 18,
+        #    180: 22,
+        #    200: 26,
+        #    250: 30,
+        #    300: 35,
+        # }
         if speed > 160:
             lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/2.5))
         elif speed > 100:
@@ -160,17 +179,35 @@ class RoarCompetitionSolution:
         vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
         heading_to_waypoint = np.arctan2(vector_to_waypoint[1],vector_to_waypoint[0])
 
-        # Calculate delta angle towards the target waypoint
+        # Calculate delta angle towards the target waypoint (basically, where do we need to steer towards?)
         delta_heading = normalize_rad(heading_to_waypoint - vehicle_rotation[2])
 
-        # Proportional controller to steer the vehicle towards the target waypoint
+        # Proportional controller to steer the vehicle towards the target waypoint 
+        # Handles steering for us - we don't need to worry about this
         steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
+
+        # Gives us an error value telling us how much we have deviated from the intended path of travel
+        # If you want to find the error specifically for a location 100 waypoints ahead, you can use this code:
+        #  really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 100)
+        #  error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, really_far_waypoint)
+        # As our selected waypoint's offset amount is a function of our speed, the error calculation will "look further ahead" at higher speeds
         error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, lookahead)
 
+        # Throttle and brake are values from 0 to 1, any values beyond this range will be clipped
+        # Intuitively, the higher brake is, the faster you slow down, the higher throttle is, the faster your speed up
+        # By default, our vehicle has the pedal to the floor
         throttle = 1
         brake = 0
         os.system("cls")
 
+        # Error can be either negative or positive, so that's why we take the absolute value
+        # It's best to observe recordings in slow motion to review exactly when these conditions are met, but the general intentions are:
+        # (1) Regardless of speed, when error grows too large, emergency brake
+        # (2) When both speed and error are high, slow down
+        # (3) When speed is high but error is moderate, decelerate slightly in order to avoid fishtailing
+        # (4) At high speeds, stop acceleration but maintain velocity to avoid burning precious momentum while preventing fishtailing
+        #     - when PID starts panicking at high speeds, it will start to swing further and further out of control even if you config the coefficients to be less aggressive
+        #     - this can partially be fixed by correcting hiccups and weird offsets in the waypoints
         if abs(error) > 0.3 and speed > 60:
             print("Giant error")
             throttle = 0
@@ -188,10 +225,13 @@ class RoarCompetitionSolution:
             throttle = 0.7
             brake = 0
 
+        # Debug information, feel free to add more as you test
         print(round(steer_control * 100)/100)
         print(round(error * 100)/100)
         print(round(speed))
 
+        # Don't worry about this - though we definitely should implement gear shifting functionality
+        # For reference, last comp's winning solution scaled gear based on speed: gear = max(1, (int)(current_speed**1.15 / 96))
         control = {
             "throttle": np.clip(throttle, 0.0, 1.0),
             "steer": steer_control,
@@ -210,6 +250,7 @@ class LatPIDController():
         self._error_buffer = deque(maxlen=10)
         self._dt = dt
 
+    # PID equation implementation, decides where to steer
     def run_in_series(self, vehicle_location, vehicle_rotation, current_speed, next_waypoint) -> float:
         v_begin = vehicle_location
         direction_vector = np.array([
@@ -251,6 +292,7 @@ class LatPIDController():
 
         return lat_control
 
+    # Feeds the coefficients we specify in the dictionary above into a format the program can understand better
     def find_k_values(self, current_speed: float, config: dict) -> np.array:
         k_p, k_d, k_i = 1, 0, 0
         for speed_upper_bound, kvalues in config.items():
@@ -260,6 +302,7 @@ class LatPIDController():
                 break
         return np.array([k_p, k_d, k_i])
 
+    # A cut-down and simplified version of run_in_series, but only yields an error value instead
     def find_waypoint_error(self, vehicle_location, vehicle_rotation, current_speed, waypoint) -> float:
         v_begin = vehicle_location
         direction_vector = np.array([
@@ -284,5 +327,6 @@ class LatPIDController():
 
         return error
 
+    # Get the waypoint ___ indices ahead of the current (use offset parameter)
     def get_waypoint_at_offset(self, maneuverable_waypoints, current_index, offset):
         return maneuverable_waypoints[(current_index + offset) % len(maneuverable_waypoints)]
