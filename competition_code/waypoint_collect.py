@@ -6,6 +6,7 @@ import asyncio
 from typing import List, Optional, Dict, Any
 from PIL.Image import Image
 import pygame
+import os
 
 WAYPOINT_DISTANCE = 2.0
 WAYPOINT_LANE_WIDTH = 12.0
@@ -107,11 +108,18 @@ async def main():
     carla_world.set_asynchronous(True)
     carla_world.set_control_steps(0.0, 0.005)
 
+    carla_world.maneuverable_waypoints = (
+            roar_py_interface.RoarPyWaypoint.load_waypoint_list(
+                # waypoints9 best
+                np.load(f"waypoints9.npz")
+            )
+        )
+
     # spawn_point, spawn_rpy = carla_world.spawn_points[
     #     np.random.randint(len(carla_world.spawn_points))
     # ]
 
-    spawn_point, spawn_rpy = carla_world.spawn_points[0]
+    spawn_point, spawn_rpy = carla_world.spawn_points[1]
 
     print("Spawning vehicle at", spawn_point, spawn_rpy)
 
@@ -160,6 +168,7 @@ async def main():
                         vehicle.get_roll_pitch_yaw(),
                         WAYPOINT_LANE_WIDTH,
                     )
+
                 else:
                     waypoint_locations = np.asarray(
                         [
@@ -210,7 +219,7 @@ async def main():
     finally:
         roar_py_instance.close()
         np.savez_compressed(
-            "waypoints.npz",
+            "new.npz",
             **roar_py_interface.RoarPyWaypoint.save_waypoint_list(waypoints)
         )
 
