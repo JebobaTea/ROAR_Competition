@@ -1,8 +1,3 @@
-"""
-Competition instructions:
-Please do not change anything else but fill out the to-do sections.
-"""
-
 import roar_py_interface
 import numpy as np
 import os
@@ -65,48 +60,48 @@ class RoarCompetitionSolution:
                 "Ki": 0.08
         },
         "90": {
-                "Kp": 0.53,
+                "Kp": 0.57,
                 "Kd": 0.13,
                 "Ki": 0.09
         },
         "100": {
-                "Kp": 0.45,
+                "Kp": 0.5,
                 "Kd": 0.15,
                 "Ki": 0.1
         },
         "120": {
                 "Kp": 0.4,
-                "Kd": 0.2,
+                "Kd": 0.15,
                 "Ki": 0.1
         },
         "130": {
-                "Kp": 0.32,
-                "Kd": 0.2,
+                "Kp": 0.35,
+                "Kd": 0.15,
                 "Ki": 0.09
         },
         "140": {
-                "Kp": 0.1,
-                "Kd": 0.2,
+                "Kp": 0.3,
+                "Kd": 0.15,
                 "Ki": 0.09
         },
         "160": {
-                "Kp": 0.03,
+                "Kp": 0.25,
                 "Kd": 0.3,
                 "Ki": 0.06
         },
         "180": {
-                "Kp": 0.02,
-                "Kd": 0.3,
+                "Kp": 0.15,
+                "Kd": 0.25,
                 "Ki": 0.05
         },
         "200": {
-                "Kp": 0.02,
-                "Kd": 0.3,
+                "Kp": 0.01,
+                "Kd": 0.4,
                 "Ki": 0.04
         },
         "230": {
-                "Kp": 0.02,
-                "Kd": 0.3,
+                "Kp": 0.01,
+                "Kd": 0.4,
                 "Ki": 0.05
         },
         "300": {
@@ -208,21 +203,24 @@ class RoarCompetitionSolution:
         # (4) At high speeds, stop acceleration but maintain velocity to avoid burning precious momentum while preventing fishtailing
         #     - when PID starts panicking at high speeds, it will start to swing further and further out of control even if you config the coefficients to be less aggressive
         #     - this can partially be fixed by correcting hiccups and weird offsets in the waypoints
-        if abs(error) > 0.3 and speed > 60:
+        if abs(error) > 0.3 and speed > 80:
             print("Giant error")
-            throttle = 0
-            brake = 1
-        elif abs(error) > 0.2 and speed > 80:
+            throttle = 0.1
+            brake = 0.9
+            if (speed > 140):
+                throttle = 0
+                brake = 1
+        elif abs(error) > 0.2 and speed > 120:
             print("Large error")
             throttle = 0.5
             brake = 0.5
-        elif abs(error) > 0.1 and speed > 120:
+        elif abs(error) > 0.1 and speed > 150:
             print("Mid error")
             throttle = 0.8
             brake = 0.2
         elif abs(error) > 0.05 and speed > 160:
             print("Small error")
-            throttle = 0.7
+            throttle = 0.8
             brake = 0
 
         # Debug information, feel free to add more as you test
@@ -238,7 +236,7 @@ class RoarCompetitionSolution:
             "brake": np.clip(brake, 0.0, 1.0),
             "hand_brake": 0.0,
             "reverse": 0,
-            "target_gear": 0
+            "target_gear": max(1, int(speed / 60))
         }
         await self.vehicle.apply_action(control)
         return control
