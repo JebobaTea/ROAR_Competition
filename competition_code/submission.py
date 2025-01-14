@@ -204,29 +204,34 @@ class RoarCompetitionSolution:
         #     - when PID starts panicking at high speeds, it will start to swing further and further out of control even if you config the coefficients to be less aggressive
         #     - this can partially be fixed by correcting hiccups and weird offsets in the waypoints
         if abs(error) > 0.3 and speed > 80:
-            print("Giant error")
+            print("Control Case 1")
             throttle = 0.1
             brake = 0.9
             if (speed > 140):
+                print("Control Case 1a")
                 throttle = 0
                 brake = 1
         elif abs(error) > 0.2 and speed > 120:
-            print("Large error")
+            print("Control Case 2")
             throttle = 0.5
             brake = 0.5
         elif abs(error) > 0.1 and speed > 150:
-            print("Mid error")
+            print("Control Case 3")
             throttle = 0.8
             brake = 0.2
         elif abs(error) > 0.05 and speed > 160:
-            print("Small error")
+            print("Control Case 4")
             throttle = 0.8
             brake = 0
 
         # Debug information, feel free to add more as you test
-        print(round(steer_control * 100)/100)
-        print(round(error * 100)/100)
-        print(round(speed))
+        print("Steer: " + str(round(steer_control * 100)/100))
+        print("Error: " + str(round(error * 100)/100))
+        print("Speed: " + str(round(speed)))
+        print("K-Values: " + str(self.lat_pid_controller.find_k_values(speed, self.get_lateral_pid_config())))
+        print("Throttle: " + str(throttle))
+        print("Brake: " + str(brake))
+        print("Target Gear: " + str(max(1, int(speed / 40))))
 
         # Don't worry about this - though we definitely should implement gear shifting functionality
         # For reference, last comp's winning solution scaled gear based on speed: gear = max(1, (int)(current_speed**1.15 / 96))
