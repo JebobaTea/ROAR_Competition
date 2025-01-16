@@ -117,7 +117,7 @@ class RoarCompetitionSolution:
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
-
+        self.maneuverable_waypoints = (roar_py_interface.RoarPyWaypoint.load_waypoint_list(np.load(f"{os.path.dirname(__file__)}\\test.npz")))
         self.current_waypoint_idx = 10
         self.current_waypoint_idx = filter_waypoints(
             vehicle_location,
