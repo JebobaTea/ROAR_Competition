@@ -3,6 +3,7 @@ import numpy as np
 import os
 from collections import deque
 from typing import List, Tuple, Dict, Optional
+from DumbMutationModel import DumbMutationModel
 
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
@@ -29,6 +30,7 @@ class RoarCompetitionSolution:
         rpy_sensor : roar_py_interface.RoarPyRollPitchYawSensor = None,
         occupancy_map_sensor : roar_py_interface.RoarPyOccupancyMapSensor = None,
         collision_sensor : roar_py_interface.RoarPyCollisionSensor = None,
+        model: DumbMutationModel = None,
     ) -> None:
         self.maneuverable_waypoints = maneuverable_waypoints
         self.vehicle = vehicle
@@ -39,6 +41,18 @@ class RoarCompetitionSolution:
         self.occupancy_map_sensor = occupancy_map_sensor
         self.collision_sensor = collision_sensor
         self.lat_pid_controller = LatPIDController(config=self.get_lateral_pid_config())
+        self.model = model
+        self.coeff = 1
+
+        best = DumbMutationModel()
+        n = np.load("b.npz")
+        best.w1 = n['arr_0']
+        best.w2 = n['arr_1']
+        best.w3 = n['arr_2']
+        best.b1 = n['arr_3']
+        best.b2 = n['arr_4']
+        best.b3 = n['arr_5']
+        self.model = best
 
     # Modify PID equation coefficients depending on speed
     # Refer to chart on the slides for the effects of raising/lowering each individual parameter
@@ -129,109 +143,56 @@ class RoarCompetitionSolution:
     async def step(
         self
     ) -> None:
-        # Receive location, rotation and velocity data
         vehicle_location = self.location_sensor.get_last_gym_observation()
         vehicle_rotation = self.rpy_sensor.get_last_gym_observation()
         vehicle_velocity = self.velocity_sensor.get_last_gym_observation()
-        vehicle_velocity_norm = np.linalg.norm(vehicle_velocity)
-        speed = vehicle_velocity_norm * 3.6
+        vehicle_speed = np.linalg.norm(vehicle_velocity) * 3.6
 
-
-        # Find the waypoint closest to the vehicle
+        # Get nearest waypoint and determine target waypoints
         self.current_waypoint_idx = filter_waypoints(
-            vehicle_location,
-            self.current_waypoint_idx,
-            self.maneuverable_waypoints
+            vehicle_location, self.current_waypoint_idx, self.maneuverable_waypoints
         )
-         # Steering control is always determined by the waypoint 3 ahead of the current waypoint
-        waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 3)
+        waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints,
+                                                                            self.current_waypoint_idx, 3)
+        far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints,
+                                                                      self.current_waypoint_idx, 25)
+        near_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints,
+                                                                       self.current_waypoint_idx, 10)
+        lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints,
+                                                                   self.current_waypoint_idx,
+                                                                   int(vehicle_speed / self.coeff))
 
-        # To determine when we slow down in anticipation of a turn, we select a waypoint ___ indices ahead of the current waypoint depending on the speed
-        # The lookahead variable refers to the waypoint in question
-        # To get a reference to a waypoint 20 waypoints ahead of the current waypoint, for example, use 
-        #   waypoint_20_ahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 20)
-        # Last competition round's winning submission actually used a predefined configuration dictionary instead of scaling offsets as a function of speed, see below:
-        # speed_to_lookahead_dict = {
-        #    90: 8,
-        #    110: 12,
-        #    130: 14,
-        #    160: 18,
-        #    180: 22,
-        #    200: 26,
-        #    250: 30,
-        #    300: 35,
-        # }
-        if speed > 160:
-            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/2.5))
-        elif speed > 100:
-            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/3))
-        elif speed > 80:
-            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/10))
-        else:
-            lookahead = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, int(speed/15))
+        # Steering control
+        steer_control = self.lat_pid_controller.run_in_series(
+            vehicle_location, vehicle_rotation, vehicle_speed, waypoint_to_follow
+        )
+        far_error = self.lat_pid_controller.find_waypoint_error(
+            vehicle_location, vehicle_rotation, vehicle_speed, far_waypoint
+        )
+        near_error = self.lat_pid_controller.find_waypoint_error(
+            vehicle_location, vehicle_rotation, vehicle_speed, near_waypoint
+        )
+        dynamic_error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, vehicle_speed,
+                                                                    lookahead)
 
-        # Calculate delta vector towards the target waypoint
-        vector_to_waypoint = (waypoint_to_follow.location - vehicle_location)[:2]
-        heading_to_waypoint = np.arctan2(vector_to_waypoint[1],vector_to_waypoint[0])
+        model_input = np.array([
+            [near_error, far_error, dynamic_error, vehicle_speed / 300, steer_control]
+        ])
+        model_output = await self.model.feed_forward(model_input)
 
-        # Calculate delta angle towards the target waypoint (basically, where do we need to steer towards?)
-        delta_heading = normalize_rad(heading_to_waypoint - vehicle_rotation[2])
+        throttle = abs(model_output.item(0))
+        self.coeff = model_output.item(1) * 10
+        brake = abs(model_output.item(2))
 
-        # Proportional controller to steer the vehicle towards the target waypoint 
-        # Handles steering for us - we don't need to worry about this
-        steer_control = self.lat_pid_controller.run_in_series(vehicle_location, vehicle_rotation, speed, waypoint_to_follow)
-
-        # Gives us an error value telling us how much we have deviated from the intended path of travel
-        # If you want to find the error specifically for a location 100 waypoints ahead, you can use this code:
-        #  really_far_waypoint = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints, self.current_waypoint_idx, 100)
-        #  error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, really_far_waypoint)
-        # As our selected waypoint's offset amount is a function of our speed, the error calculation will "look further ahead" at higher speeds
-        error = self.lat_pid_controller.find_waypoint_error(vehicle_location, vehicle_rotation, speed, lookahead)
-
-        # Throttle and brake are values from 0 to 1, any values beyond this range will be clipped
-        # Intuitively, the higher brake is, the faster you slow down, the higher throttle is, the faster your speed up
-        # By default, our vehicle has the pedal to the floor
-        throttle = 1
-        brake = 0
-        os.system("cls")
-
-        # Error can be either negative or positive, so that's why we take the absolute value
-        # It's best to observe recordings in slow motion to review exactly when these conditions are met, but the general intentions are:
-        # (1) Regardless of speed, when error grows too large, emergency brake
-        # (2) When both speed and error are high, slow down
-        # (3) When speed is high but error is moderate, decelerate slightly in order to avoid fishtailing
-        # (4) At high speeds, stop acceleration but maintain velocity to avoid burning precious momentum while preventing fishtailing
-        #     - when PID starts panicking at high speeds, it will start to swing further and further out of control even if you config the coefficients to be less aggressive
-        #     - this can partially be fixed by correcting hiccups and weird offsets in the waypoints
-        if abs(error) > 0.3 and speed > 80:
-            print("Control Case 1")
-            throttle = 0.1
-            brake = 0.9
-            if (speed > 140):
-                print("Control Case 1a")
-                throttle = 0
-                brake = 1
-        elif abs(error) > 0.2 and speed > 120:
-            print("Control Case 2")
-            throttle = 0.5
-            brake = 0.5
-        elif abs(error) > 0.1 and speed > 150:
-            print("Control Case 3")
-            throttle = 0.8
-            brake = 0.2
-        elif abs(error) > 0.05 and speed > 160:
-            print("Control Case 4")
-            throttle = 0.8
+        if (vehicle_speed < 60):
             brake = 0
-
+        os.system("cls")
         # Debug information, feel free to add more as you test
         print("Steer: " + str(round(steer_control * 100)/100))
-        print("Error: " + str(round(error * 100)/100))
-        print("Speed: " + str(round(speed)))
-        print("K-Values: " + str(self.lat_pid_controller.find_k_values(speed, self.get_lateral_pid_config())))
+        print("Speed: " + str(round(vehicle_speed)))
         print("Throttle: " + str(throttle))
         print("Brake: " + str(brake))
-        print("Target Gear: " + str(max(1, int(speed / 40))))
+        print("Target Gear: " + str(max(1, int(vehicle_speed / 40))))
 
         # Don't worry about this - though we definitely should implement gear shifting functionality
         # For reference, last comp's winning solution scaled gear based on speed: gear = max(1, (int)(current_speed**1.15 / 96))
@@ -241,7 +202,7 @@ class RoarCompetitionSolution:
             "brake": np.clip(brake, 0.0, 1.0),
             "hand_brake": 0.0,
             "reverse": 0,
-            "target_gear": max(1, int(speed / 60))
+            "target_gear": max(1, int(vehicle_speed / 60))
         }
         await self.vehicle.apply_action(control)
         return control
